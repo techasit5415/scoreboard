@@ -62,7 +62,9 @@
   // Load contest information
   async function loadContestInfo() {
     try {
+      console.log('🔄 Loading contest information...');
       const res = await fetch(CONTEST_URL);
+      
       if (res.ok) {
         const data = await res.json();
         contestInfo = data.contest;
@@ -73,11 +75,30 @@
           problems.sort((a, b) => a.label.localeCompare(b.label));
         }
         
-        console.log('Contest info loaded:', contestInfo);
-        console.log('Problems loaded (sorted):', problems);
+        console.log('✅ Contest info loaded:', contestInfo?.name);
+        console.log('🧩 Problems loaded (sorted):', problems?.length);
+      } else {
+        console.error('❌ Failed to load contest info:', res.status, res.statusText);
+        // Set fallback data
+        contestInfo = {
+          id: 'fallback',
+          name: 'Contest (Loading Failed)',
+          start_time: new Date().toISOString(),
+          end_time: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString()
+        };
+        problems = [];
       }
     } catch (e) {
-      console.error('Error loading contest info:', e);
+      console.error('💥 Error loading contest info:', e);
+      addNotification('⚠️ Failed to load contest information', 'warning');
+      // Set fallback data
+      contestInfo = {
+        id: 'error',
+        name: 'Contest (Error)',
+        start_time: new Date().toISOString(),
+        end_time: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString()
+      };
+      problems = [];
     }
   }
 
@@ -358,6 +379,7 @@
   // ดึงคะแนนจาก API (fallback)
   async function loadScoreboard() {
     try {
+      console.log('🔄 Loading scoreboard data...');
       const res = await fetch(API_URL, {
         method: 'GET',
         headers: {
@@ -366,11 +388,14 @@
       });
       
       if (!res.ok) {
+        console.error('❌ Scoreboard API error:', res.status, res.statusText);
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       
       const data = await res.json();
       teams = data.teams || [];
+      
+      console.log('✅ Scoreboard loaded:', teams.length, 'teams');
       
       // เรียงลำดับทีมตาม rank จาก API
       teams.sort((a, b) => a.rank - b.rank);
@@ -383,14 +408,41 @@
       });
       
     } catch (e) {
-      console.error('Error loading scoreboard:', e);
+      console.error('💥 Error loading scoreboard:', e);
+      addNotification('⚠️ Failed to load scoreboard data', 'warning');
+      
       // สร้างข้อมูลตัวอย่างเพื่อทดสอบ
       teams = [
-        { name: "KMITL Team 1", score: 450, solved: 7 },
-        { name: "KMITL Team 2", score: 380, solved: 6 },
-        { name: "KMITL Team 3", score: 320, solved: 5 },
-        { name: "KMITL Team 4", score: 280, solved: 4 },
-        { name: "KMITL Team 5", score: 220, solved: 3 }
+        { 
+          name: "KMITL Team 1", 
+          display_name: "KMITL Team 1",
+          score: { num_points: 450 }, 
+          num_solved: 7,
+          rank: 1,
+          team_id: "1",
+          affiliation: "KMITL",
+          problems: []
+        },
+        { 
+          name: "KMITL Team 2", 
+          display_name: "KMITL Team 2",
+          score: { num_points: 380 }, 
+          num_solved: 6,
+          rank: 2,
+          team_id: "2",
+          affiliation: "KMITL",
+          problems: []
+        },
+        { 
+          name: "KMITL Team 3", 
+          display_name: "KMITL Team 3",
+          score: { num_points: 320 }, 
+          num_solved: 5,
+          rank: 3,
+          team_id: "3",
+          affiliation: "KMITL",
+          problems: []
+        }
       ];
     }
     loading = false;

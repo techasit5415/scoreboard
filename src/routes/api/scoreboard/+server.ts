@@ -6,16 +6,20 @@ import { env } from '$env/dynamic/private';
 async function getOrganizationsData(baseUrl: string, headers: Record<string, string>, fetch: any) {
   try {
     const orgsUrl = baseUrl.replace('/scoreboard', '/organizations');
-    console.log('Fetching organizations from:', orgsUrl);
+    console.log('🏢 Fetching organizations from:', orgsUrl);
     
     const response = await fetch(orgsUrl, { 
-      headers,
-      signal: AbortSignal.timeout(5000)
+      headers: {
+        ...headers,
+        'Accept': 'application/json',
+        'User-Agent': 'SCQ-Scoreboard/1.0'
+      },
+      signal: AbortSignal.timeout(10000) // Increased timeout
     });
     
     if (response.ok) {
       const organizations = await response.json();
-      console.log('Organizations data:', organizations);
+      console.log('✅ Organizations data loaded:', organizations.length);
       
       // สร้าง mapping จาก organization_id ไป logo data
       const orgMap: Record<string, any> = {};
@@ -77,6 +81,8 @@ async function getTeamsData(baseUrl: string, headers: Record<string, string>, fe
 }
 
 export const GET: RequestHandler = async ({ fetch }: { fetch: any }) => {
+  console.log('🚀 Starting scoreboard API request...');
+  
   // Sample data with KMITL teams
   const sampleTeams = [
     { name: "KMITL Algorithm Masters", score: 8, solved: 8 },
@@ -90,10 +96,16 @@ export const GET: RequestHandler = async ({ fetch }: { fetch: any }) => {
   
   try {
     // Check if there are any contests first
-    console.log('Checking for available contests...');
+    console.log('🔍 Checking for available contests...');
     const contestsResponse = await fetch('http://codearcade.cskmitl.com/api/v4/contests', {
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(10000), // Increased timeout
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'SCQ-Scoreboard/1.0'
+      }
     });
+    
+    console.log('📡 Contests response status:', contestsResponse.status);
     
     if (contestsResponse.ok) {
       const contests = await contestsResponse.json();
@@ -186,17 +198,33 @@ export const GET: RequestHandler = async ({ fetch }: { fetch: any }) => {
         
         // Sort by rank
         teams.sort((a: any, b: any) => a.rank - b.rank);
+        
+        console.log('✅ Successfully processed teams:', teams.length);
+        return new Response(JSON.stringify({ teams: teams.length > 0 ? teams : sampleTeams }), {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } else {
+        console.warn('⚠️ No scoreboard data available, using sample data');
       }
-
-      console.log('Processed teams:', teams);
-      return json({ teams: teams.length > 0 ? teams : sampleTeams });
+    } else {
+      console.error('❌ Failed to fetch contests:', contestsResponse.status);
     }
     
   } catch (error) {
-    console.error('Error fetching scoreboard:', error);
+    console.error('💥 Error fetching scoreboard:', error);
   }
   
   // Return sample data as fallback
-  console.log('Using sample data as fallback');
-  return json({ teams: sampleTeams });
+  console.log('🔄 Using sample data as fallback');
+  return new Response(JSON.stringify({ teams: sampleTeams }), {
+    headers: { 
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Access-Control-Allow-Origin': '*'
+    }
+  });
 };
