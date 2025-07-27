@@ -21,7 +21,7 @@ export const GET = async ({ fetch }: { fetch: any }) => {
         
         try {
           // Get latest scoreboard data
-          const response = await fetch('http://localhost:5173/api/scoreboard');
+          const response = await fetch('http://localhost:8080/api/scoreboard');
           if (response.ok && !isClosed) {
             const data = await response.json();
             
