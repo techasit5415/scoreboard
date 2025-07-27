@@ -20,8 +20,14 @@ export const GET = async ({ fetch }: { fetch: any }) => {
         if (isClosed) return;
         
         try {
-          // Get latest scoreboard data
-          const response = await fetch('http://localhost:8080/api/scoreboard');
+          // Get latest scoreboard data from our own API
+          const response = await fetch('http://localhost:8080/api/scoreboard', {
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Internal/Event-Feed'
+            }
+          });
+          
           if (response.ok && !isClosed) {
             const data = await response.json();
             
@@ -35,7 +41,7 @@ export const GET = async ({ fetch }: { fetch: any }) => {
             try {
               controller.enqueue(new TextEncoder().encode(eventData));
             } catch (error) {
-              // Controller is probably closed
+              console.error('Controller error:', error);
               isClosed = true;
               if (intervalId) clearInterval(intervalId);
               if (heartbeatId) clearInterval(heartbeatId);

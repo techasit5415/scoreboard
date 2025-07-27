@@ -591,13 +591,16 @@
     document.documentElement.setAttribute('data-theme', currentTheme);
     
     // ลองใช้ EventSource ก่อน
-    setupEventSource();
+    // setupEventSource();
     
     // Fallback: โหลดข้อมูลครั้งแรกด้วย regular HTTP request
     await loadScoreboard();
     
+    // Set connection status to connected since we're using polling
+    connectionStatus = 'connected';
+    
     // แจ้งเตือนการเชื่อมต่อ
-    addNotification('🔗 Connected to DOMjudge scoreboard!', 'info');
+    addNotification('🔗 Connected to scoreboard using polling!', 'info');
     
     // บังคับรีเฟรชข้อมูลทุก 5 วินาที (เร็วขึ้นอีก)
     const refreshInterval = setInterval(async () => {
