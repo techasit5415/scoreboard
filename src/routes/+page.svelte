@@ -205,12 +205,12 @@
           bVal = (b.display_name || b.name).toLowerCase();
           break;
         case 'solved':
-          aVal = a.num_solved || 0;
-          bVal = b.num_solved || 0;
+          aVal = a.score?.num_solved || 0;
+          bVal = b.score?.num_solved || 0;
           break;
         case 'score':
-          aVal = a.score?.num_points || 0;
-          bVal = b.score?.num_points || 0;
+          aVal = a.score?.total_time || 0;
+          bVal = b.score?.total_time || 0;
           break;
         default:
           return 0;
@@ -2072,14 +2072,14 @@
           <!-- Solved Problems Count -->
           <div style="width: 80px; text-align: center;">
             <div class="solved-count">
-              {team.num_solved || 0}
+              {team.score?.num_solved || 0}
             </div>
           </div>
           
           <!-- Score -->
           <div style="width: 100px; text-align: center;">
             <div class="score">
-              {team.score?.num_points || 0}
+              {team.score?.total_time || 0}
             </div>
             {#if team.score?.total_time}
               <div class="penalty-time">
@@ -2095,18 +2095,18 @@
               {@const problemColor = convertColor(problem.color)}
               
               <div class="problem-cell" 
-                   style={teamProblem?.solved || teamProblem?.num_pending > 0 || (teamProblem && !teamProblem.solved && teamProblem.attempts > 0) || teamProblem?.first_to_solve ? "" : "background-color: " + problemColor + "33; border: 2px solid " + problemColor + ";"}
+                   style={teamProblem?.solved || teamProblem?.num_pending > 0 || (teamProblem && !teamProblem.solved && teamProblem.num_judged > 0) || teamProblem?.first_to_solve ? "" : "background-color: " + problemColor + "33; border: 2px solid " + problemColor + ";"}
                    class:solved={teamProblem?.solved}
-                   class:attempted={teamProblem && !teamProblem.solved && (teamProblem.attempts > 0)}
+                   class:attempted={teamProblem && !teamProblem.solved && (teamProblem.num_judged > 0)}
                    class:pending={teamProblem?.num_pending > 0}
                    class:first-solve={teamProblem?.first_to_solve}
-                   data-tooltip="{problem.label}: {teamProblem?.attempts || 0} attempts">
+                   data-tooltip="{problem.label}: {teamProblem?.num_judged || 0} attempts">
                 
                 {#if teamProblem?.solved}
-                  <div class="problem-attempts">{teamProblem.attempts || 0}</div>
+                  <div class="problem-attempts">{teamProblem.num_judged || 0}</div>
                   <div class="problem-time">{formatTime(teamProblem.time)}</div>
-                {:else if teamProblem?.attempts > 0}
-                  <div class="problem-attempts">-{teamProblem.attempts}</div>
+                {:else if teamProblem?.num_judged > 0}
+                  <div class="problem-attempts">-{teamProblem.num_judged}</div>
                 {:else if teamProblem?.num_pending > 0}
                   <div class="problem-attempts">?</div>
                 {:else}
@@ -2158,10 +2158,10 @@
             <strong>Rank:</strong> #{selectedTeam.rank || '—'}
           </div>
           <div>
-            <strong>Solved:</strong> {selectedTeam.num_solved || 0} problems
+            <strong>Solved:</strong> {selectedTeam.score?.num_solved || 0} problems
           </div>
           <div>
-            <strong>Score:</strong> {selectedTeam.score?.num_points || 0}
+            <strong>Score:</strong> {selectedTeam.score?.total_time || 0}
           </div>
           <div>
             <strong>Penalty:</strong> {formatTime(selectedTeam.score?.total_time || 0)}
