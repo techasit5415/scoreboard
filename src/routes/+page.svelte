@@ -1,5 +1,6 @@
 <script>
   import { fly, scale, fade } from 'svelte/transition';
+  import { flip } from 'svelte/animate';
   import { onMount, onDestroy } from 'svelte';
   let teams = [];
   let contestInfo = null;
@@ -26,6 +27,11 @@
   let showTeamDetails = false;
   let selectedTeam = null;
   let teamRankingAnimations = {}; // Track ranking animations
+  
+  // Animation system for rank changes
+  let previousRankings = new Map(); // Store previous rankings for comparison
+  let rankChangeAnimations = new Map(); // Track teams with rank changes
+  let animationDuration = 800; // Animation duration in ms
 
   // URLs
   const API_URL = '/api/scoreboard';
@@ -315,11 +321,6 @@
     }, 1000);
   }
 
-  // Get ranking animation class
-  function getRankingAnimationClass(teamId) {
-    return teamRankingAnimations[teamId] || '';
-  }
-
   // Format time helper
   function formatTime(seconds) {
     const hours = Math.floor(seconds / 3600);
@@ -376,6 +377,57 @@
     });
   }
 
+  // Function to detect and animate rank changes
+  function detectRankChanges(newTeams) {
+    // Clear previous animations
+    rankChangeAnimations.clear();
+    
+    // Create new rankings map
+    const newRankings = new Map();
+    newTeams.forEach(team => {
+      newRankings.set(team.team_id, team.rank);
+    });
+    
+    // Compare with previous rankings
+    if (previousRankings.size > 0) {
+      newRankings.forEach((newRank, teamId) => {
+        const oldRank = previousRankings.get(teamId);
+        if (oldRank && oldRank !== newRank) {
+          // Rank changed! Mark for animation
+          rankChangeAnimations.set(teamId, {
+            oldRank,
+            newRank,
+            direction: newRank < oldRank ? 'up' : 'down',
+            timestamp: Date.now()
+          });
+          console.log(`🔄 Rank change detected: Team ${teamId} from ${oldRank} to ${newRank}`);
+        }
+      });
+    }
+    
+    // Update previous rankings
+    previousRankings = new Map(newRankings);
+    
+    // Clear animations after duration
+    setTimeout(() => {
+      rankChangeAnimations.clear();
+      rankChangeAnimations = rankChangeAnimations; // Trigger reactivity
+    }, animationDuration + 200);
+  }
+
+  // Get animation class for team rank change
+  function getRankingAnimationClass(teamId) {
+    const animation = rankChangeAnimations.get(teamId);
+    if (!animation) return '';
+    
+    return animation.direction === 'up' ? 'rank-up' : 'rank-down';
+  }
+  
+  // Check if team has rank change animation
+  function hasRankAnimation(teamId) {
+    return rankChangeAnimations.has(teamId);
+  }
+
   // ดึงคะแนนจาก API (fallback)
   async function loadScoreboard() {
     try {
@@ -393,19 +445,25 @@
       }
       
       const data = await res.json();
-      teams = data.teams || [];
+      const newTeams = data.teams || [];
       
-      console.log('✅ Scoreboard loaded:', teams.length, 'teams');
+      console.log('✅ Scoreboard loaded:', newTeams.length, 'teams');
       
       // เรียงลำดับทีมตาม rank จาก API
-      teams.sort((a, b) => a.rank - b.rank);
+      newTeams.sort((a, b) => a.rank - b.rank);
       
       // เรียงลำดับปัญหาของแต่ละทีมให้ตรงกับลำดับ problems
-      teams.forEach(team => {
+      newTeams.forEach(team => {
         if (team.problems) {
           team.problems = sortTeamProblems(team.problems);
         }
       });
+      
+      // Detect rank changes and setup animations
+      detectRankChanges(newTeams);
+      
+      // Update teams data
+      teams = newTeams;
       
     } catch (e) {
       console.error('💥 Error loading scoreboard:', e);
@@ -990,6 +1048,54 @@
     font-size: 1.2rem;
     font-weight: bold;
     color: var(--text-primary);
+    transition: all 0.8s ease;
+  }
+
+  /* Rank change animations */
+  .rank.rank-up {
+    animation: rankUp 0.8s ease-in-out;
+    color: #27ae60;
+    text-shadow: 0 0 15px #27ae60;
+  }
+
+  .rank.rank-down {
+    animation: rankDown 0.8s ease-in-out;
+    color: #e74c3c;
+    text-shadow: 0 0 15px #e74c3c;
+  }
+
+  @keyframes rankUp {
+    0% { transform: translateY(0) scale(1); }
+    25% { transform: translateY(-10px) scale(1.2); color: #27ae60; }
+    50% { transform: translateY(-5px) scale(1.1); }
+    75% { transform: translateY(-2px) scale(1.05); }
+    100% { transform: translateY(0) scale(1); }
+  }
+
+  @keyframes rankDown {
+    0% { transform: translateY(0) scale(1); }
+    25% { transform: translateY(10px) scale(1.2); color: #e74c3c; }
+    50% { transform: translateY(5px) scale(1.1); }
+    75% { transform: translateY(2px) scale(1.05); }
+    100% { transform: translateY(0) scale(1); }
+  }
+
+  /* Team row animation when rank changes */
+  .team-row.rank-changed {
+    background: linear-gradient(90deg, 
+      rgba(52, 152, 219, 0.1) 0%, 
+      rgba(52, 152, 219, 0.2) 50%, 
+      rgba(52, 152, 219, 0.1) 100%);
+    animation: rowHighlight 0.8s ease-in-out;
+    border-left: 4px solid #3498db;
+  }
+
+  @keyframes rowHighlight {
+    0% { box-shadow: none; }
+    25% { box-shadow: 0 0 20px rgba(52, 152, 219, 0.5); }
+    50% { box-shadow: 0 0 25px rgba(52, 152, 219, 0.7); }
+    75% { box-shadow: 0 0 20px rgba(52, 152, 219, 0.5); }
+    100% { box-shadow: none; }
   }
 
   .rank.gold {
@@ -2018,6 +2124,7 @@
         {#if sortColumn === 'score'}
           <span class="sort-icon">{sortDirection === 'asc' ? '↑' : '↓'}</span>
         {/if}
+
       </div>
       <div class="header-item" style="flex: 2;">Problems</div>
     </div>
@@ -2029,13 +2136,13 @@
       </div>
     {:else}
       {#each filteredTeams as team, index (team.team_id || index)}
-        <div class="team-row {getRankingAnimationClass(team.team_id || team.name) ? 'rank-changed' : ''}" 
+        <div class="team-row {hasRankAnimation(team.team_id) ? 'rank-changed' : ''}" 
              in:fly="{{ y: 50, duration: 300, delay: index * 50 }}" 
              on:click={() => showTeamDetailsModal(team)}>
           
           <!-- Rank -->
           <div style="width: 60px; text-align: center;">
-            <div class="rank {getRankingAnimationClass(team.team_id || team.name)}" 
+            <div class="rank {getRankingAnimationClass(team.team_id)}" 
                  class:gold={team.rank === 1} 
                  class:silver={team.rank === 2} 
                  class:bronze={team.rank === 3}>
