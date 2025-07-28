@@ -20,6 +20,10 @@ export default defineConfig({
 			'Access-Control-Allow-Origin': '*',
 			'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 			'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+		},
+		hmr: {
+			port: 8081, // Use a different port for HMR to avoid conflicts
+			host: 'localhost'
 		}
 	},
 	preview: {

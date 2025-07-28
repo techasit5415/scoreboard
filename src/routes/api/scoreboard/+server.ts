@@ -1,6 +1,10 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
+import { getApiBaseUrl } from '$lib/config';
+
+// Get API Base URL from configuration
+const API_BASE = getApiBaseUrl();
 
 // ฟังก์ชันดึงข้อมูล organizations เพื่อให้ได้ logo URLs
 async function getOrganizationsData(baseUrl: string, headers: Record<string, string>, fetch: any) {
@@ -28,8 +32,7 @@ async function getOrganizationsData(baseUrl: string, headers: Record<string, str
           orgMap[org.id] = {
             name: org.name,
             formal_name: org.formal_name,
-            shortname: org.shortname,
-            logo: org.logo && org.logo.length > 0 ? org.logo[0] : null // เอา logo แรก
+            logo: org.logo
           };
         });
       }
@@ -80,24 +83,45 @@ async function getTeamsData(baseUrl: string, headers: Record<string, string>, fe
   return {};
 }
 
-export const GET: RequestHandler = async ({ fetch }: { fetch: any }) => {
-  console.log('🚀 Starting scoreboard API request...');
-  
-  // Sample data with KMITL teams
+export const GET: RequestHandler = async ({ fetch }) => {
+  console.log('🔗 Using API base URL:', API_BASE);
+
+  // Fallback data structure
   const sampleTeams = [
-    { name: "KMITL Algorithm Masters", score: 8, solved: 8 },
-    { name: "KMITL Code Warriors", score: 7, solved: 7 },
-    { name: "KMITL Debug Heroes", score: 6, solved: 6 },
-    { name: "KMITL Binary Ninjas", score: 5, solved: 5 },
-    { name: "KMITL Recursive Rebels", score: 4, solved: 4 },
-    { name: "KMITL Data Structures", score: 3, solved: 3 },
-    { name: "KMITL Graph Theorists", score: 2, solved: 2 }
+    {
+      rank: 1,
+      team_id: '1',
+      display_name: 'Sample Team 1',
+      affiliation: 'KMITL',
+      solved: 3,
+      time: 180,
+      score: { num_solved: 3, total_time: 180 },
+      problems: [
+        { problem_id: '1', num_judged: 1, num_pending: 0, solved: true, time: 30, first_to_solve: false },
+        { problem_id: '2', num_judged: 2, num_pending: 0, solved: true, time: 90, first_to_solve: false },
+        { problem_id: '3', num_judged: 1, num_pending: 0, solved: true, time: 180, first_to_solve: false }
+      ]
+    },
+    {
+      rank: 2,
+      team_id: '2',
+      display_name: 'Sample Team 2',
+      affiliation: 'KMITL',
+      solved: 2,
+      time: 150,
+      score: { num_solved: 2, total_time: 150 },
+      problems: [
+        { problem_id: '1', num_judged: 1, num_pending: 0, solved: true, time: 45, first_to_solve: false },
+        { problem_id: '2', num_judged: 1, num_pending: 0, solved: true, time: 105, first_to_solve: false },
+        { problem_id: '3', num_judged: 2, num_pending: 0, solved: false, time: 0, first_to_solve: false }
+      ]
+    }
   ];
   
   try {
     // Check if there are any contests first
     console.log('🔍 Checking for available contests...');
-    const contestsResponse = await fetch('http://codearcade.cskmitl.com/api/v4/contests', {
+    const contestsResponse = await fetch(`${API_BASE}/api/v4/contests`, {
       signal: AbortSignal.timeout(10000), // Increased timeout
       headers: {
         'Accept': 'application/json',
@@ -109,118 +133,89 @@ export const GET: RequestHandler = async ({ fetch }: { fetch: any }) => {
     
     if (contestsResponse.ok) {
       const contests = await contestsResponse.json();
-      console.log(`Found ${contests.length} contests`);
+      console.log('🏆 Found contests:', contests.length);
       
-      if (contests.length === 0) {
-        console.log('No active contests found, using sample data');
-        return json({ teams: sampleTeams });
-      }
-      
-      // Use the first available contest
-    //   const contestId = contests[0].id;
-            const contestId = 2;
-
-      console.log(`Using contest ID: ${contestId}`);
-      
-      const apiUrl = `http://codearcade.cskmitl.com/api/v4/contests/${contestId}/scoreboard?allteams=false&strict=false`;
-        //  const apiUrl = `http://codearcade.cskmitl.com/api/v4/contests/3/scoreboard?allteams=false&strict=false`;
-
-      const username = env.DOMJUDGE_USERNAME;
-      const password = env.DOMJUDGE_PASSWORD;
-      
-      const headers: Record<string, string> = {
-        'Accept': 'application/json',
-        'User-Agent': 'SCQ-Scoreboard/1.0',
-        'Content-Type': 'application/json'
-      };
-      
-      // Add authentication if available
-      if (username && password) {
-        const auth = btoa(`${username}:${password}`);
-        headers['Authorization'] = `Basic ${auth}`;
-      }
-      
-      console.log('Fetching from:', apiUrl);
-      
-      // Get teams data for name resolution
-      const teamMap = await getTeamsData(apiUrl, headers, fetch);
-      
-      // Get organizations data for logo URLs
-      const orgMap = await getOrganizationsData(apiUrl, headers, fetch);
-      
-      const response = await fetch(apiUrl, { 
-        headers,
-        signal: AbortSignal.timeout(10000)
-      });
-
-      console.log('Response status:', response.status);
-
-      if (!response.ok) {
-        console.log(`API returned ${response.status}, using sample data`);
-        return json({ teams: sampleTeams });
-      }
-
-      const data = await response.json();
-      console.log('Raw API data:', JSON.stringify(data, null, 2));
-      
-      // Transform DOMjudge API response
-      let teams = [];
-      
-      if (data && data.rows && Array.isArray(data.rows)) {
-        teams = data.rows.map((row: any) => {
-          const teamData = teamMap[row.team_id];
-          const orgData = teamData?.organization_id ? orgMap[teamData.organization_id] : null;
+      if (contests.length > 0) {
+        const contest = contests[0];
+        const contestId = contest.id;
+        
+        console.log('🎯 Using contest:', contestId, contest.name);
+        
+        // Use Basic Auth if available
+        const username = env.DOMJUDGE_USERNAME;
+        const password = env.DOMJUDGE_PASSWORD;
+        
+        const headers: Record<string, string> = {
+          'Accept': 'application/json',
+          'User-Agent': 'SCQ-Scoreboard/1.0'
+        };
+        
+        if (username && password) {
+          const auth = btoa(`${username}:${password}`);
+          headers['Authorization'] = `Basic ${auth}`;
+          console.log('🔐 Using Basic Auth with username:', username);
+        }
+        
+        const apiUrl = `${API_BASE}/api/v4/contests/${contestId}/scoreboard?allteams=false&strict=false`;
+        console.log('📊 Fetching scoreboard from:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
+          headers,
+          signal: AbortSignal.timeout(15000) // Increased timeout for scoreboard
+        });
+        
+        console.log('📈 Scoreboard response status:', response.status);
+        
+        if (response.ok) {
+          const scoreboard = await response.json();
+          console.log('✅ Scoreboard data loaded, teams:', scoreboard.rows?.length);
           
-          return {
-            name: teamData?.name || `Team ${row.team_id}`,
-            display_name: teamData?.display_name || teamData?.name || `Team ${row.team_id}`,
-            affiliation: teamData?.affiliation || null,
-            organization_id: teamData?.organization_id || null,
-            logo_url: orgData?.logo ? `http://codearcade.cskmitl.com/api/v4/${orgData.logo.href}` : null,
-            score: row.score?.num_solved || 0,
-            solved: row.score?.num_solved || 0,
-            total_time: row.score?.total_time || 0,
-            rank: row.rank || 0,
+          // Get additional data for enhanced display
+          const organizationsData = await getOrganizationsData(apiUrl, headers, fetch);
+          const teamsData = await getTeamsData(apiUrl, headers, fetch);
+          
+          const teams = (scoreboard.rows || []).map((row: any, index: number) => ({
+            rank: row.rank || index + 1,
             team_id: row.team_id,
-            // เพิ่มข้อมูล problems แต่ละข้อ
-            problems: row.problems ? row.problems.map((prob: any, index: number) => ({
-              label: prob.label,
-              problem_id: prob.problem_id,
-              solved: prob.solved || false,
-              num_judged: prob.num_judged || 0,
-              num_pending: prob.num_pending || 0,
-              time: prob.time || 0,
-              first_to_solve: prob.first_to_solve || false,
-              attempts: prob.num_judged || 0
-            })) : []
-          };
-        });
-        
-        // Sort by rank
-        teams.sort((a: any, b: any) => a.rank - b.rank);
-        
-        console.log('✅ Successfully processed teams:', teams.length);
-        return new Response(JSON.stringify({ teams: teams.length > 0 ? teams : sampleTeams }), {
-          headers: { 
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
+            display_name: teamsData[row.team_id]?.display_name || row.team?.display_name || `Team ${row.team_id}`,
+            affiliation: teamsData[row.team_id]?.affiliation || row.team?.affiliation || 'Unknown',
+            solved: row.score?.num_solved || 0,
+            time: row.score?.total_time || 0,
+            score: row.score || { num_solved: 0, total_time: 0 },
+            problems: row.problems || [],
+            organization_id: teamsData[row.team_id]?.organization_id,
+            logo_url: organizationsData[teamsData[row.team_id]?.organization_id]?.logo ? 
+              `${API_BASE}/api/v4/${organizationsData[teamsData[row.team_id]?.organization_id].logo.href}` : null,
+          }));
+          
+          console.log('🎉 Successfully processed', teams.length, 'teams');
+          
+          return new Response(JSON.stringify({ teams: teams.length > 0 ? teams : sampleTeams }), {
+            headers: { 
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        } else {
+          console.warn('⚠️ Failed to fetch scoreboard, using sample data');
+          return json({ teams: sampleTeams });
+        }
       } else {
-        console.warn('⚠️ No scoreboard data available, using sample data');
+        console.warn('⚠️ No contests found, using sample data');
+        return json({ teams: sampleTeams });
       }
     } else {
-      console.error('❌ Failed to fetch contests:', contestsResponse.status);
+      console.warn('⚠️ Failed to fetch contests, using sample data');
+      return json({ teams: sampleTeams });
     }
     
   } catch (error) {
     console.error('💥 Error fetching scoreboard:', error);
   }
   
-  // Return sample data as fallback
-  console.log('🔄 Using sample data as fallback');
   return new Response(JSON.stringify({ teams: sampleTeams }), {
+    status: 200, // Return 200 instead of 500 for fallback
     headers: { 
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
